@@ -46,14 +46,24 @@ export default async function handler(req: NodeRequest, res: NodeResponse): Prom
 
   try {
     const snapshot = await getSupply();
-    const body =
-      field === "total-supply"
-        ? { result: snapshot.totalSupply }
-        : field === "circulating-supply"
-          ? { result: snapshot.circulatingSupply }
-          : field === "burned-supply"
-            ? { result: snapshot.burnedSupply }
-            : snapshot;
+    const nftMatch = /^(genesis|generations)-(total|circulating)-supply$/.exec(field);
+    let body: unknown;
+    if (nftMatch) {
+      const collection = snapshot.nft.collections.find((item) => item.key === nftMatch[1]);
+      const count =
+        nftMatch[2] === "total" ? collection?.totalSupply : collection?.circulatingSupply;
+      body = { result: String(count ?? 0) };
+    } else if (field === "nft-supply") {
+      body = snapshot.nft;
+    } else if (field === "total-supply") {
+      body = { result: snapshot.totalSupply };
+    } else if (field === "circulating-supply") {
+      body = { result: snapshot.circulatingSupply };
+    } else if (field === "burned-supply") {
+      body = { result: snapshot.burnedSupply };
+    } else {
+      body = snapshot;
+    }
     res.statusCode = 200;
     res.end(JSON.stringify(body));
   } catch (error) {

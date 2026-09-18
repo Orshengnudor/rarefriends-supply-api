@@ -59,6 +59,47 @@ export const HOLDERS: HolderConfig[] = [
   },
 ];
 
+/** Address holding non-circulating inventory for both the token and the NFTs. */
+export const RESERVE_ADDRESS = "0xA850B2499c064900EfF341745807e1cB0d71a52b";
+
+/**
+ * RF released by the reserve per Genesis it takes in. The reserve opened with
+ * the entire 1,024,000,000 RF launch supply and no NFTs, so this rate is what
+ * ties the two sides together: reserveGenesis * 1,000,000 + reserveRF always
+ * equals the launch supply. `reserveInvariantHolds` checks it on every read.
+ */
+export const RF_PER_GENESIS = 1_000_000n;
+
+export interface NftCollectionConfig {
+  key: "genesis" | "generations";
+  name: string;
+  address: string;
+  /** Hard cap where the contract enforces one, null when the supply is open. */
+  maxSupply: number | null;
+  note: string;
+}
+
+/**
+ * The two Rare Friends collections. Both are ERC-721 without Enumerable, so
+ * minted count comes from totalMinted() rather than totalSupply().
+ */
+export const NFT_COLLECTIONS: NftCollectionConfig[] = [
+  {
+    key: "genesis",
+    name: "Rare Friends Genesis",
+    address: "0x116EaA62241751E0c98dA43d458600c6C17cD361",
+    maxSupply: 1024,
+    note: "Founding collection, capped at 1,024 and fully minted. Genesis held by the reserve is out of circulation: it re-enters only when a holder swaps in a replacement Genesis, which keeps the reserve count flat.",
+  },
+  {
+    key: "generations",
+    name: "Rare Friends Generations",
+    address: "0x14C49e6118F46525dE9ab41a51cBAA3c6EBF181D",
+    maxSupply: null,
+    note: "Open collection, no cap. Minted on demand when a holder hardwires a Friend.",
+  },
+];
+
 /* ------------------------------------------------------------------ *
  * JSON-RPC
  * ------------------------------------------------------------------ */
@@ -115,6 +156,8 @@ async function batch(calls: RpcCall[]): Promise<string[]> {
 /** ERC-20 selectors, left-padded address argument. */
 const SELECTOR_TOTAL_SUPPLY = "0x18160ddd";
 const SELECTOR_BALANCE_OF = "0x70a08231";
+/** ERC-721 mint counter. Neither collection implements Enumerable. */
+const SELECTOR_TOTAL_MINTED = "0xa2309ff8";
 
 function balanceOfData(address: string): string {
   return SELECTOR_BALANCE_OF + address.toLowerCase().replace(/^0x/, "").padStart(64, "0");
@@ -147,6 +190,30 @@ export interface HolderSnapshot extends HolderConfig {
   balance: string;
 }
 
+export interface NftCollectionSnapshot extends NftCollectionConfig {
+  /** Every token ever minted. Nothing is burned in either collection. */
+  totalSupply: number;
+  /** Held by the Genesis reserve, therefore out of circulation. */
+  reserveHeld: number;
+  /** totalSupply minus reserveHeld. */
+  circulatingSupply: number;
+}
+
+export interface NftSnapshot {
+  chain: { name: string; id: number };
+  blockNumber: number;
+  reserveAddress: string;
+  collections: NftCollectionSnapshot[];
+  /**
+   * reserveGenesis * 1,000,000 RF + reserve RF balance, which must equal the
+   * 1,024,000,000 launch supply. False means the two sides have diverged and
+   * the numbers should not be trusted.
+   */
+  reserveInvariantHolds: boolean;
+  updatedAt: string;
+  stale: boolean;
+}
+
 export interface SupplySnapshot {
   token: { address: string; symbol: string; decimals: number };
   chain: { name: string; id: number };
@@ -158,6 +225,8 @@ export interface SupplySnapshot {
   burnedPercent: string;
   excludedTotal: string;
   holders: HolderSnapshot[];
+  /** The NFT side of the same read, so one request covers both. */
+  nft: NftSnapshot;
   updatedAt: string;
   /** true when the RPC is unreachable and the last good read is being served. */
   stale: boolean;
@@ -174,6 +243,17 @@ async function read(): Promise<SupplySnapshot> {
       method: "eth_call",
       params: [{ to: TOKEN_ADDRESS, data: balanceOfData(holder.address) }, "latest"],
     })),
+    // NFT side: minted count and reserve holding for each collection.
+    ...NFT_COLLECTIONS.flatMap((collection) => [
+      {
+        method: "eth_call",
+        params: [{ to: collection.address, data: SELECTOR_TOTAL_MINTED }, "latest"],
+      },
+      {
+        method: "eth_call",
+        params: [{ to: collection.address, data: balanceOfData(RESERVE_ADDRESS) }, "latest"],
+      },
+    ]),
   ]);
 
   const blockNumber = Number(BigInt(results[0]!));
@@ -183,6 +263,28 @@ async function read(): Promise<SupplySnapshot> {
     const raw = BigInt(results[i + 2]!);
     return { ...holder, raw: raw.toString(), balance: formatUnits(raw) };
   });
+
+  const nftOffset = 2 + HOLDERS.length;
+  const collections: NftCollectionSnapshot[] = NFT_COLLECTIONS.map((collection, i) => {
+    const minted = Number(BigInt(results[nftOffset + i * 2]!));
+    const reserveHeld = Number(BigInt(results[nftOffset + i * 2 + 1]!));
+    return {
+      ...collection,
+      totalSupply: minted,
+      reserveHeld,
+      circulatingSupply: minted - reserveHeld,
+    };
+  });
+
+  // Cross-check the two sides of the reserve against the launch supply.
+  const reserveRf = holders.find(
+    (holder) => holder.address.toLowerCase() === RESERVE_ADDRESS.toLowerCase(),
+  );
+  const reserveGenesis = BigInt(collections.find((c) => c.key === "genesis")?.reserveHeld ?? 0);
+  const scale = 10n ** BigInt(DECIMALS);
+  const reserveInvariantHolds =
+    reserveRf !== undefined &&
+    reserveGenesis * RF_PER_GENESIS * scale + BigInt(reserveRf.raw) === LAUNCH_SUPPLY * scale;
 
   const excluded = holders
     .filter((holder) => holder.excluded)
@@ -203,6 +305,15 @@ async function read(): Promise<SupplySnapshot> {
     burnedPercent: (Number(burnedBps) / 100).toFixed(2),
     excludedTotal: formatUnits(excluded),
     holders,
+    nft: {
+      chain: { name: CHAIN_NAME, id: CHAIN_ID },
+      blockNumber,
+      reserveAddress: RESERVE_ADDRESS,
+      collections,
+      reserveInvariantHolds,
+      updatedAt: new Date().toISOString(),
+      stale: false,
+    },
     updatedAt: new Date().toISOString(),
     stale: false,
   };
@@ -223,7 +334,10 @@ export async function getSupply(): Promise<SupplySnapshot> {
       return snapshot;
     })
     .catch((error) => {
-      if (cache) return { ...cache.snapshot, stale: true };
+      if (cache) {
+        const last = cache.snapshot;
+        return { ...last, stale: true, nft: { ...last.nft, stale: true } };
+      }
       throw error;
     })
     .finally(() => {

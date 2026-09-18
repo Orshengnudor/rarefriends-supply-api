@@ -12,6 +12,26 @@
     {
       "source": "/api/burned-supply",
       "destination": "/api/supply?field=burned-supply"
+    },
+    {
+      "source": "/api/nft-supply",
+      "destination": "/api/supply?field=nft-supply"
+    },
+    {
+      "source": "/api/genesis-total-supply",
+      "destination": "/api/supply?field=genesis-total-supply"
+    },
+    {
+      "source": "/api/genesis-circulating-supply",
+      "destination": "/api/supply?field=genesis-circulating-supply"
+    },
+    {
+      "source": "/api/generations-total-supply",
+      "destination": "/api/supply?field=generations-total-supply"
+    },
+    {
+      "source": "/api/generations-circulating-supply",
+      "destination": "/api/supply?field=generations-circulating-supply"
     }
   ]
 }
