@@ -1,0 +1,17 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    {
+      "source": "/api/total-supply",
+      "destination": "/api/supply?field=total-supply"
+    },
+    {
+      "source": "/api/circulating-supply",
+      "destination": "/api/supply?field=circulating-supply"
+    },
+    {
+      "source": "/api/burned-supply",
+      "destination": "/api/supply?field=burned-supply"
+    }
+  ]
+}
