@@ -5,9 +5,9 @@ on Robinhood Chain (chain id 4663), read live from the token contract with `eth_
 
 | Endpoint | Returns |
 | --- | --- |
-| `/api/circulating-supply` | `{"result":"<decimal>"}` — total supply minus excluded holders |
-| `/api/total-supply` | `{"result":"<decimal>"}` — on-chain `totalSupply()`, net of burns |
-| `/api/burned-supply` | `{"result":"<decimal>"}` — launch supply minus total supply |
+| `/api/circulating-supply` | `{"result":"<decimal>"}`, total supply minus excluded holders |
+| `/api/total-supply` | `{"result":"<decimal>"}`, on-chain `totalSupply()`, net of burns |
+| `/api/burned-supply` | `{"result":"<decimal>"}`, launch supply minus total supply |
 | `/api/supply` | full breakdown: block height, per-holder balances, burn percentage |
 
 All values carry 18 decimal places. No authentication, CORS open to `*`, 60-second cache.
@@ -29,11 +29,11 @@ vercel env add RPC_URL_FALLBACK
 ```
 
 `RPC_URL_PRIMARY` is the public Robinhood RPC (`https://rpc.mainnet.chain.robinhood.com`).
-`RPC_URL_FALLBACK` is your keyed RPC (Alchemy), used automatically when the public one fails —
+`RPC_URL_FALLBACK` is your keyed RPC (Alchemy), used automatically when the public one fails , 
 store it as a Secret. Either way the key stays server-side; it is never exposed to the browser.
 
 Point a real domain (e.g. `api.rarefriends.com`) at the project before submitting the endpoints
-anywhere — HTTP-only or preview hosts get rejected by listing reviews.
+anywhere, HTTP-only or preview hosts get rejected by listing reviews.
 
 ## Local run
 

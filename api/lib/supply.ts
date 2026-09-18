@@ -1,12 +1,12 @@
 /**
- * $RAREFRIENDS (RF) supply reader — Robinhood Chain (chain id 4663).
+ * $RAREFRIENDS (RF) supply reader, Robinhood Chain (chain id 4663).
  *
  * Framework-free on purpose: the Hono/oRPC routes in this repo and the
  * standalone serverless function in the deploy bundle both import this file,
  * so the page, the API and any other host can never report different numbers.
  *
  * Everything is a raw eth_call against the token contract. No indexer, no
- * database, no trusted third party — anyone can rerun the calls below.
+ * database, no trusted third party, anyone can rerun the calls below.
  */
 
 export const TOKEN_ADDRESS = "0x0779369854d3EcdEA927206718FFD7730C67B71f";
@@ -19,7 +19,7 @@ export const LAUNCH_SUPPLY = 1_024_000_000n;
 
 export const DECIMALS = 18;
 
-/** Cache window in ms — CoinGecko polls every ~30 min, this keeps RPC load flat. */
+/** Cache window in ms, CoinGecko polls every ~30 min, this keeps RPC load flat. */
 const CACHE_TTL = 60_000;
 
 const FALLBACK_RPC = "https://rpc.mainnet.chain.robinhood.com";
@@ -30,13 +30,13 @@ export interface HolderConfig {
   address: string;
   /** true → balance is subtracted from circulating supply. */
   excluded: boolean;
-  /** Why it is (or is not) excluded — shown on the page, used in listing reviews. */
+  /** Why it is (or is not) excluded, shown on the page, used in listing reviews. */
   note: string;
 }
 
 /**
  * Non-circulating holders. Flip `excluded` to change what circulating supply
- * means — it is the only place that decision lives.
+ * means, it is the only place that decision lives.
  */
 export const HOLDERS: HolderConfig[] = [
   {
@@ -211,7 +211,7 @@ async function read(): Promise<SupplySnapshot> {
 /**
  * Cached snapshot. Concurrent callers share one RPC round-trip, and if the
  * chain is unreachable the last good read is returned with `stale: true`
- * rather than an error — a listing crawler must never see a 5xx.
+ * rather than an error, a listing crawler must never see a 5xx.
  */
 export async function getSupply(): Promise<SupplySnapshot> {
   if (cache && Date.now() - cache.at < CACHE_TTL) return cache.snapshot;
