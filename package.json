@@ -1,6 +1,0 @@
-{
-  "name": "rarefriends-supply-api",
-  "version": "1.0.0",
-  "private": true,
-  "description": "Total, circulating and burned supply endpoints for the $RAREFRIENDS (RF) token on Robinhood Chain"
-}
